@@ -13,7 +13,6 @@ st.set_page_config(
 
 # --- FUNGSI HALAMAN 1: ANALISIS BSM KAPAL ---
 def display_bsm_kapal():
-    # ... (Semua kode di dalam fungsi ini tetap sama persis seperti sebelumnya) ...
     # --- FUNGSI LOADING DATA (DARI GOOGLE SHEETS) ---
     @st.cache_data
     def load_data_from_gsheets(spreadsheet_id, tab_id):
@@ -56,15 +55,16 @@ def display_bsm_kapal():
         if df_aktual is not None and 'observed' in df_aktual.columns:
             col1, col2 = st.columns([3, 1])
             with col1:
+                # plot utama dengan hover unified dan marker
                 fig_aktual = px.line(df_aktual, x=df_aktual.index, y='observed')
-                fig_aktual.update_traces(
-                    hovertemplate="<b>Tanggal:</b> %{x|%d %b %Y}<br><b>Pengeluaran:</b> Rp %{y:,.0f}<extra></extra>"
-                )
+                fig_aktual.update_traces(mode='lines+markers', marker=dict(size=5, opacity = 0.8),
+                                        hovertemplate="<b>Tanggal:</b> %{x|%d %b %Y}<br><b>Pengeluaran:</b> Rp %{y:,.0f}<extra></extra>")
                 fig_aktual.update_layout(
                     height=350,
-                    yaxis_title='Nilai (Rp)',
+                    yaxis_title='Total Nominal',
                     yaxis_tickprefix='Rp ',
-                    yaxis_tickformat=',.0f'
+                    yaxis_tickformat=',.0f',
+                    hovermode='x unified'   # <- membuat hover box seperti di tab2
                 )
                 st.plotly_chart(fig_aktual, use_container_width=True)
             with col2:
@@ -81,11 +81,12 @@ def display_bsm_kapal():
         required_cols = ['trend', 'seasonal', 'resid']
         if df_aktual is not None and all(col in df_aktual.columns for col in required_cols):
             col1, col2, col3 = st.columns(3)
+            # hovertemplate konsisten dengan tab2
             hovertemplate = "<b>Tanggal:</b> %{x|%d %b %Y}<br><b>Nilai:</b> Rp %{y:,.0f}<extra></extra>"
             with col1:
                 fig_trend = px.line(df_aktual, x=df_aktual.index, y='trend', title='Komponen Trend', height=200)
-                fig_trend.update_traces(hovertemplate=hovertemplate)
-                fig_trend.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None)
+                fig_trend.update_traces(mode='lines+markers', marker=dict(size=3), hovertemplate=hovertemplate)
+                fig_trend.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None, hovermode='x unified')
                 st.plotly_chart(fig_trend, use_container_width=True)
                 st.caption("""
             - Biaya pengeluaran secara jangka panjang sedang dalam fase kenaikan yang kuat.
@@ -94,18 +95,18 @@ def display_bsm_kapal():
 
             with col2:
                 fig_seasonal = px.line(df_aktual, x=df_aktual.index, y='seasonal', title='Komponen Seasonal', height=200)
-                fig_seasonal.update_traces(hovertemplate=hovertemplate)
-                fig_seasonal.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None)
+                fig_seasonal.update_traces(mode='lines+markers', marker=dict(size=3), hovertemplate=hovertemplate)
+                fig_seasonal.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None, hovermode='x unified')
                 st.plotly_chart(fig_seasonal, use_container_width=True)
                 st.caption("""
             - Pengeluaran memiliki pola musiman tahunan yang kuat dan berulang.
             - Pola ini menjelaskan perilaku pengeluaran yang menjelaskan naik turunnya sepanjang periode.
             """)
-                
+
             with col3:
                 fig_resid = px.line(df_aktual, x=df_aktual.index, y='resid', title='Komponen Residual', height=200)
-                fig_resid.update_traces(hovertemplate=hovertemplate)
-                fig_resid.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None)
+                fig_resid.update_traces(mode='lines+markers', marker=dict(size=3), hovertemplate=hovertemplate)
+                fig_resid.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None, hovermode='x unified')
                 st.plotly_chart(fig_resid, use_container_width=True)
                 st.caption("""
             - Risiko biaya tak terduga yang tidak cukup dijelaskan dengan trend dan musiman.
@@ -129,8 +130,8 @@ def display_bsm_kapal():
                 max_error_date = df_error_test['error'].idxmax()
                 max_error_value = df_error_test['error'].max()
                 col1, col2, col3 = st.columns(3)
-                col1.metric(label="Relative RMSE (RRMSE)", value=f"{rrmse:.2f}%")
-                col2.metric(label="Rata-rata Error (MAE)", value=f"Rp {mae:,.0f}")
+                col1.metric(label="Relative RMSE (RRMSE)", value=f"{rrmse:.2f}%", help=f"Nilai forecast memiliki kesalahan relatif sekitar **{rrmse:.2f}%** berdasarkan data uji.")
+                col2.metric(label="Rata-rata Error (MAE)", value=f"Rp {mae:,.0f}", help=f"Rata-rata prediksi meleset sekitar **Rp {mae:,.0f}** dari nilai aktual pada data uji.")
                 col3.metric(label="Error Tertinggi Terjadi Pada", value=max_error_date.strftime('%d %B %Y'), help=f"Selisih sebesar Rp {max_error_value:,.0f}")
             else:
                 st.warning("Tidak ada periode data test yang tumpang tindih untuk dihitung performanya.")
@@ -142,20 +143,50 @@ def display_bsm_kapal():
         plot_col, table_col = st.columns([3, 1])
         with plot_col:
             fig = go.Figure()
-            if df_aktual is not None: fig.add_trace(go.Scatter(x=df_aktual.index, y=df_aktual['observed'], mode='lines', name='Data Aktual', line=dict(color='#0068C9', width=2)))
-            if df_train is not None: fig.add_trace(go.Scatter(x=df_train.index, y=df_train['Train Pred'], mode='lines', name='Hasil Training', line=dict(color='#FFAA00', width=2, dash='dash')))
-            if df_test is not None: fig.add_trace(go.Scatter(x=df_test.index, y=df_test['prediksi_inti'], mode='lines', name='Prediksi Test', line=dict(color='#FF4B4B', width=2)))
+            if df_aktual is not None:
+                fig.add_trace(go.Scatter(
+                    x=df_aktual.index, y=df_aktual['observed'],
+                    mode='lines+markers', name='Data Aktual',
+                    line=dict(color='#0068C9', width=2),
+                    marker=dict(size=6, opacity=0.5),
+                ))
+            if df_train is not None:
+                fig.add_trace(go.Scatter(
+                    x=df_train.index, y=df_train['Train Pred'],
+                    mode='lines+markers', name='Hasil Training',
+                    line=dict(color='#FFAA00', width=2, dash='dash'),
+                    marker=dict(size=6, opacity=0.5)
+                ))
+            if df_test is not None:
+                fig.add_trace(go.Scatter(
+                    x=df_test.index, y=df_test['prediksi_inti'],
+                    mode='lines+markers', name='Prediksi Test',
+                    line=dict(color='#FF4B4B', width=2),
+                    marker=dict(size=6, opacity=0.5)
+                ))
             if df_forecast is not None:
-                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['batas_atas_99'], mode='lines', line=dict(width=0), hoverinfo='skip', showlegend=False))
-                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['batas_bawah_99'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(45, 201, 55, 0.2)', hoverinfo='skip', name='Batas Risiko Forecast'))
-                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['prediksi_inti'], mode='lines', name='Forecast', line=dict(color='#2DC937', width=3), customdata=df_forecast[['batas_bawah_99', 'batas_atas_99']], hovertemplate="<b>Forecast: Rp %{y:,.0f}</b><br>Batas Bawah: Rp %{customdata[0]:,.0f}<br>Batas Atas: Rp %{customdata[1]:,.0f}<extra></extra>"))
+                # batas atas/bawah tetap sebagai area, tanpa marker
+                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['batas_atas_99'],
+                                         mode='lines', line=dict(width=0), hoverinfo='skip', showlegend=False))
+                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['batas_bawah_99'],
+                                         mode='lines', line=dict(width=0), fill='tonexty',
+                                         fillcolor='rgba(45, 201, 55, 0.2)', hoverinfo='skip', name='Batas Risiko Forecast'))
+                # forecast centerline dengan markers
+                fig.add_trace(go.Scatter(
+                    x=df_forecast.index, y=df_forecast['prediksi_inti'],
+                    mode='lines+markers', name='Forecast',
+                    line=dict(color='#2DC937', width=3),
+                    marker=dict(size=7, opacity=0.5),
+                    customdata=df_forecast[['batas_bawah_99', 'batas_atas_99']],
+                    hovertemplate="<b>Forecast: Rp %{y:,.0f}</b><br>Batas Bawah: Rp %{customdata[0]:,.0f}<br>Batas Atas: Rp %{customdata[1]:,.0f}<extra></extra>"
+                ))
 
             if df_forecast is not None and not df_forecast.empty:
                 start_forecast_date = df_forecast.index.min()
                 fig.add_shape(type="line", x0=start_forecast_date, y0=0, x1=start_forecast_date, y1=1, yref="paper", line=dict(color="grey", width=2, dash="dash"))
                 fig.add_annotation(x=start_forecast_date, y=1.05, yref="paper", text="Mulai Forecast", showarrow=False, xanchor="left")
 
-            fig.update_layout(title_text="", xaxis_title='BSM_CREATED_ON', yaxis_title='Nilai (Rp)', yaxis_tickprefix='Rp ', yaxis_tickformat=',.0f', hovermode='x unified', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            fig.update_layout(title_text="", xaxis_title='BSM_CREATED_ON', yaxis_title='Total Nominal', yaxis_tickprefix='Rp ', yaxis_tickformat=',.0f', hovermode='x unified', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig, use_container_width=True)
 
         with table_col:
@@ -192,9 +223,9 @@ def display_bsm_kapal():
         st.caption("Tabel ini menggabungkan semua data yang digunakan dalam grafik di atas.")
         st.dataframe(unified_df, column_config={"BSM_CREATED_ON": st.column_config.DateColumn("BSM_CREATED_ON", format="DD MMM YYYY")}, use_container_width=True, hide_index=True)
 
+
 # --- FUNGSI UNTUK HALAMAN DUMMY BSM ALAT BERAT ---
 def display_bsm_alat_berat():
-    # ... (Semua kode di dalam fungsi ini tetap sama persis seperti sebelumnya) ...
     # --- FUNGSI LOADING DATA (DARI GOOGLE SHEETS) ---
     @st.cache_data
     def load_data_from_gsheets(spreadsheet_id, tab_id):
@@ -220,14 +251,14 @@ def display_bsm_alat_berat():
     TAB_ID_FORECAST = "0"
 
     # --- MEMUAT DATA ---
-    with st.spinner("Memuat data untuk Analisis BSM alat_berat..."):
+    with st.spinner("Memuat data untuk Analisis BSM Alat Berat..."):
         df_aktual = load_data_from_gsheets(SPREADSHEET_ID, TAB_ID_AKTUAL)
         df_train = load_data_from_gsheets(SPREADSHEET_ID, TAB_ID_TRAIN)
         df_test = load_data_from_gsheets(SPREADSHEET_ID, TAB_ID_TEST)
         df_forecast = load_data_from_gsheets(SPREADSHEET_ID, TAB_ID_FORECAST)
     
     # --- KONTEN HALAMAN ---
-    st.header("Dasbor Hasil Analisis - BSM alat_berat")
+    st.header("Dasbor Hasil Analisis - BSM Alat Berat")
 
     # --- MENGGUNAKAN TABS UNTUK ORGANISASI KONTEN ---
     tab1, tab2, tab3 = st.tabs(["🧩 Dekomposisi Data", "📊 Forecast Result", "📄 Tinjau Data"])
@@ -237,15 +268,16 @@ def display_bsm_alat_berat():
         if df_aktual is not None and 'observed' in df_aktual.columns:
             col1, col2 = st.columns([3, 1])
             with col1:
+                # plot utama dengan hover unified dan marker
                 fig_aktual = px.line(df_aktual, x=df_aktual.index, y='observed')
-                fig_aktual.update_traces(
-                    hovertemplate="<b>Tanggal:</b> %{x|%d %b %Y}<br><b>Pengeluaran:</b> Rp %{y:,.0f}<extra></extra>"
-                )
+                fig_aktual.update_traces(mode='lines+markers', marker=dict(size=5, opacity = 0.8),
+                                        hovertemplate="<b>Tanggal:</b> %{x|%d %b %Y}<br><b>Pengeluaran:</b> Rp %{y:,.0f}<extra></extra>")
                 fig_aktual.update_layout(
                     height=350,
-                    yaxis_title='Nilai (Rp)',
+                    yaxis_title='Total Nominal',
                     yaxis_tickprefix='Rp ',
-                    yaxis_tickformat=',.0f'
+                    yaxis_tickformat=',.0f',
+                    hovermode='x unified'   # <- membuat hover box seperti di tab2
                 )
                 st.plotly_chart(fig_aktual, use_container_width=True)
             with col2:
@@ -262,11 +294,12 @@ def display_bsm_alat_berat():
         required_cols = ['trend', 'seasonal', 'resid']
         if df_aktual is not None and all(col in df_aktual.columns for col in required_cols):
             col1, col2, col3 = st.columns(3)
+            # hovertemplate konsisten dengan tab2
             hovertemplate = "<b>Tanggal:</b> %{x|%d %b %Y}<br><b>Nilai:</b> Rp %{y:,.0f}<extra></extra>"
             with col1:
                 fig_trend = px.line(df_aktual, x=df_aktual.index, y='trend', title='Komponen Trend', height=200)
-                fig_trend.update_traces(hovertemplate=hovertemplate)
-                fig_trend.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None)
+                fig_trend.update_traces(mode='lines+markers', marker=dict(size=3), hovertemplate=hovertemplate)
+                fig_trend.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None, hovermode='x unified')
                 st.plotly_chart(fig_trend, use_container_width=True)
                 st.caption("""
             - Rata-rata biaya jangka panjang menunjukkan kecenderungan menurun dari 2023 hingga 2025.
@@ -275,18 +308,18 @@ def display_bsm_alat_berat():
 
             with col2:
                 fig_seasonal = px.line(df_aktual, x=df_aktual.index, y='seasonal', title='Komponen Seasonal', height=200)
-                fig_seasonal.update_traces(hovertemplate=hovertemplate)
-                fig_seasonal.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None)
+                fig_seasonal.update_traces(mode='lines+markers', marker=dict(size=3), hovertemplate=hovertemplate)
+                fig_seasonal.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None, hovermode='x unified')
                 st.plotly_chart(fig_seasonal, use_container_width=True)
                 st.caption("""
             - Pengeluaran memiliki pola musiman tahunan yang kuat dan berulang.
             - Pola ini menjelaskan perilaku pengeluaran yang menjelaskan naik turunnya sepanjang periode.
             """)
-                
+
             with col3:
                 fig_resid = px.line(df_aktual, x=df_aktual.index, y='resid', title='Komponen Residual', height=200)
-                fig_resid.update_traces(hovertemplate=hovertemplate)
-                fig_resid.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None)
+                fig_resid.update_traces(mode='lines+markers', marker=dict(size=3), hovertemplate=hovertemplate)
+                fig_resid.update_layout(margin=dict(t=30, b=10, l=10, r=10), yaxis_title=None, xaxis_title=None, hovermode='x unified')
                 st.plotly_chart(fig_resid, use_container_width=True)
                 st.caption("""
             - Risiko biaya tak terduga yang tidak cukup dijelaskan dengan trend dan musiman.
@@ -294,6 +327,7 @@ def display_bsm_alat_berat():
             """)
         else:
             st.info("Data dekomposisi (kolom 'trend', 'seasonal', 'resid') tidak ditemukan.")
+
 
     with tab2:
         st.subheader("Ringkasan Performa pada Data Test")
@@ -310,8 +344,8 @@ def display_bsm_alat_berat():
                 max_error_date = df_error_test['error'].idxmax()
                 max_error_value = df_error_test['error'].max()
                 col1, col2, col3 = st.columns(3)
-                col1.metric(label="Relative RMSE (RRMSE)", value=f"{rrmse:.2f}%")
-                col2.metric(label="Rata-rata Error (MAE)", value=f"Rp {mae:,.0f}")
+                col1.metric(label="Relative RMSE (RRMSE)", value=f"{rrmse:.2f}%", help=f"Nilai forecast memiliki kesalahan relatif sekitar **{rrmse:.2f}%** berdasarkan data uji.")
+                col2.metric(label="Rata-rata Error (MAE)", value=f"Rp {mae:,.0f}", help=f"Rata-rata prediksi meleset sekitar **Rp {mae:,.0f}** dari nilai aktual pada data uji.")
                 col3.metric(label="Error Tertinggi Terjadi Pada", value=max_error_date.strftime('%d %B %Y'), help=f"Selisih sebesar Rp {max_error_value:,.0f}")
             else:
                 st.warning("Tidak ada periode data test yang tumpang tindih untuk dihitung performanya.")
@@ -323,20 +357,48 @@ def display_bsm_alat_berat():
         plot_col, table_col = st.columns([3, 1])
         with plot_col:
             fig = go.Figure()
-            if df_aktual is not None: fig.add_trace(go.Scatter(x=df_aktual.index, y=df_aktual['observed'], mode='lines', name='Data Aktual', line=dict(color='#0068C9', width=2)))
-            if df_train is not None: fig.add_trace(go.Scatter(x=df_train.index, y=df_train['Train Pred'], mode='lines', name='Hasil Training', line=dict(color='#FFAA00', width=2, dash='dash')))
-            if df_test is not None: fig.add_trace(go.Scatter(x=df_test.index, y=df_test['prediksi_inti'], mode='lines', name='Prediksi Test', line=dict(color='#FF4B4B', width=2)))
+            if df_aktual is not None:
+                fig.add_trace(go.Scatter(
+                    x=df_aktual.index, y=df_aktual['observed'],
+                    mode='lines+markers', name='Data Aktual',
+                    line=dict(color='#0068C9', width=2),
+                    marker=dict(size=6, opacity=0.5)
+                ))
+            if df_train is not None:
+                fig.add_trace(go.Scatter(
+                    x=df_train.index, y=df_train['Train Pred'],
+                    mode='lines+markers', name='Hasil Training',
+                    line=dict(color='#FFAA00', width=2, dash='dash'),
+                    marker=dict(size=6, opacity=0.5)
+                ))
+            if df_test is not None:
+                fig.add_trace(go.Scatter(
+                    x=df_test.index, y=df_test['prediksi_inti'],
+                    mode='lines+markers', name='Prediksi Test',
+                    line=dict(color='#FF4B4B', width=2),
+                    marker=dict(size=6, opacity=0.5)
+                ))
             if df_forecast is not None:
-                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['batas_atas_99'], mode='lines', line=dict(width=0), hoverinfo='skip', showlegend=False))
-                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['batas_bawah_99'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(45, 201, 55, 0.2)', hoverinfo='skip', name='Batas Risiko Forecast'))
-                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['prediksi_inti'], mode='lines', name='Forecast', line=dict(color='#2DC937', width=3), customdata=df_forecast[['batas_bawah_99', 'batas_atas_99']], hovertemplate="<b>Forecast: Rp %{y:,.0f}</b><br>Batas Bawah: Rp %{customdata[0]:,.0f}<br>Batas Atas: Rp %{customdata[1]:,.0f}<extra></extra>"))
+                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['batas_atas_99'],
+                                         mode='lines', line=dict(width=0), hoverinfo='skip', showlegend=False))
+                fig.add_trace(go.Scatter(x=df_forecast.index, y=df_forecast['batas_bawah_99'],
+                                         mode='lines', line=dict(width=0), fill='tonexty',
+                                         fillcolor='rgba(45, 201, 55, 0.2)', hoverinfo='skip', name='Batas Risiko Forecast'))
+                fig.add_trace(go.Scatter(
+                    x=df_forecast.index, y=df_forecast['prediksi_inti'],
+                    mode='lines+markers', name='Forecast',
+                    line=dict(color='#2DC937', width=3),
+                    marker=dict(size=7, opacity=0.5),
+                    customdata=df_forecast[['batas_bawah_99', 'batas_atas_99']],
+                    hovertemplate="<b>Forecast: Rp %{y:,.0f}</b><br>Batas Bawah: Rp %{customdata[0]:,.0f}<br>Batas Atas: Rp %{customdata[1]:,.0f}<extra></extra>"
+                ))
 
             if df_forecast is not None and not df_forecast.empty:
                 start_forecast_date = df_forecast.index.min()
                 fig.add_shape(type="line", x0=start_forecast_date, y0=0, x1=start_forecast_date, y1=1, yref="paper", line=dict(color="grey", width=2, dash="dash"))
                 fig.add_annotation(x=start_forecast_date, y=1.05, yref="paper", text="Mulai Forecast", showarrow=False, xanchor="left")
 
-            fig.update_layout(title_text="", xaxis_title='BSM_CREATED_ON', yaxis_title='Nilai (Rp)', yaxis_tickprefix='Rp ', yaxis_tickformat=',.0f', hovermode='x unified', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            fig.update_layout(title_text="", xaxis_title='BSM_CREATED_ON', yaxis_title='Total Nominal', yaxis_tickprefix='Rp ', yaxis_tickformat=',.0f', hovermode='x unified', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig, use_container_width=True)
 
         with table_col:
@@ -372,6 +434,7 @@ def display_bsm_alat_berat():
         unified_df = create_unified_display_df(df_aktual, df_train, df_test, df_forecast)
         st.caption("Tabel ini menggabungkan semua data yang digunakan dalam grafik di atas.")
         st.dataframe(unified_df, column_config={"BSM_CREATED_ON": st.column_config.DateColumn("BSM_CREATED_ON", format="DD MMM YYYY")}, use_container_width=True, hide_index=True)
+
 
 # --- BAGIAN UTAMA APLIKASI ---
 
